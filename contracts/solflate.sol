@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL
 pragma solidity ^0.8.9;
 
-// http://www.paul.sladen.org/projects/pyflate/pyflate-modified-pypy.py
+// Prior work http://www.paul.sladen.org/projects/pyflate/pyflate-modified-pypy.py
 
 // import "hardhat/console.sol";
 import "solidity-bytes-utils/contracts/BytesLib.sol";
@@ -12,47 +12,87 @@ struct Stream {
 }
 
 library IO {
-    function append(Stream memory s, bytes memory buffer) public {
+    function append(Stream memory s, bytes memory buffer) public pure {
         s.buffer = bytes.concat(s.buffer, buffer);
     }
 }
-
-contract BitfieldBase {
+struct BitFieldObj {
+    Stream f;
+    uint256 bits;
+    bytes bitfield;
+    uint256 count;
+}
+abstract contract BitfieldBase {
     using BytesLib for bytes;
     using IO for Stream;
 
-    uint256 bits;
-    uint256 bitfield;
-    uint256 count;
-
-    constructor(
-        uint256 _bits,
-        uint256 _bitfield,
-        uint256 _count
-    ) public {
-        bits = _bits;
-        bitfield = _bitfield;
-        count = _count;
+    function newStream(bytes memory input) public pure returns (Stream memory) {
+        return Stream({buffer: input, offset: 0});
+    }
+    function newObj(
+        Stream memory inputStream
+    ) public pure returns (BitFieldObj memory) {
+        return BitFieldObj({
+        f: inputStream,
+        bits: 0,
+        bitfield: '',
+        count: 0
+        });
     }
 
-    // return bytestream
+    function _more(BitFieldObj memory o) virtual public pure;
+    function snoopbits(BitFieldObj memory o, uint256 length) public  virtual  pure;
+    function readbits(BitFieldObj memory o, uint256 length) virtual  public pure;
+
     function _read(Stream memory f, uint256 length)
-        internal
-        returns (bytes chunk)
+        public pure
+        returns (bytes memory chunk)
     {
-        require(f.offset < bytes.length, "Length error");
+        require(f.offset + length < f.buffer.length, "Length error");
         chunk = f.buffer.slice(f.offset, length);
         f.offset += chunk.length;
     }
 
-    //needbits
-    //_mask
-    //toskip
-    //align
-    //dropbits
-    //dropbytes
-    //tell
-    //tellbits
+    function needbits(BitFieldObj memory o, uint256 length) public pure {
+        while (o.bits < length)
+          _more(o);
+    }
+    function _mask(uint256 n) public pure returns (uint256) {
+        return uint256((1 << uint(n)) - 1);
+    }
+    function toskip(BitFieldObj memory o) public pure returns (uint256) {
+        return o.bits & 0x7;
+    }
+
+    function align(BitFieldObj memory o) public pure {
+        readbits(o, toskip(o));
+    }
+
+    function dropbits(BitFieldObj memory o, uint256 length) public pure {
+        uint256 readLength;
+        while (length >= o.bits && length > 7) {
+            length = length- o.bits;
+            o.bits = 0;
+            unchecked {
+                readLength = length >> 3;
+            }
+            bytes memory chunk = _read(o.f, readLength);
+            length = length - (chunk.length << 3);
+        }
+        if (length > 0)
+            readbits(o, length);
+    }
+    function dropbytes(BitFieldObj memory o,uint256 count) public pure {
+        dropbits(o, count >> 3);
+    }
+    function tell(BitFieldObj memory o) public pure returns (uint256 upper, uint256 lower) {
+        upper = o.count - ((o.bits+7) >> 3);
+        lower = 7 - ((o.bits-1) & 0x07);
+    }
+    function tellbits(BitFieldObj memory o) public pure returns (uint256) {
+        (uint256 bytesN, uint256 bits) = tell(o);
+        return (bytesN << 3) + bits;
+    }
 }
 /*
 contract Bitfield {}

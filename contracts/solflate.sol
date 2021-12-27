@@ -94,8 +94,30 @@ abstract contract BitfieldBase {
         return (bytesN << 3) + bits;
     }
 }
+
+contract Bitfield is BitfieldBase {
+
+    function _more(BitFieldObj memory o) public override pure {
+        // read 1 byte from stream
+        // Place byte to the left-side of the bitfield
+        // Increase length
+    }
+    function snoopbits(BitFieldObj memory o, uint256 count) public  override  pure {
+        // TODO
+        // if count is above the bitfield length
+        // return with bits operation on bitfield
+    }
+    function readbits(BitFieldObj memory o, uint256 length)  public override pure {
+        //TODO
+        // read bytes
+        // advance offset in stream (IN STREAM)
+        // put in bitfields
+        // return r
+    }
+        //
+
+}
 /*
-contract Bitfield {}
 contract RBitfield {}
 contract HuffmanLength {}
 contract HuffmanTable {}

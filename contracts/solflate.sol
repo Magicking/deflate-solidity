@@ -96,11 +96,16 @@ abstract contract BitfieldBase {
 }
 
 contract Bitfield is BitfieldBase {
+    using BytesLib for bytes;
 
     function _more(BitFieldObj memory o) public override pure {
         // read 1 byte from stream
+        bytes memory buf = _read(o.f, 1);
+        require(buf.length == 1, "Reached end of stream");
         // Place byte to the left-side of the bitfield
+        o.bitfield.concat(buf);
         // Increase length
+        o.bits++;
     }
     function snoopbits(BitFieldObj memory o, uint256 count) public  override  pure {
         // TODO
